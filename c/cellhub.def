@@ -99,6 +99,10 @@ From: ubuntu:22.04
     cd /opt
     git clone https://github.com/sansomlab/cellhub.git
     cd cellhub
+
+    # Remove Cairo from install.packages.R before running it
+    sed -i '/^[[:space:]]*"Cairo",/d' ./R/install.packages.R
+
     python setup.py develop
     pip install -r ./python/requirements.txt
     
@@ -121,7 +125,7 @@ From: ubuntu:22.04
     Rscript -e "install.packages('Cairo', repos='https://cloud.r-project.org', dependencies=TRUE)"
 
     Rscript R/install.packages.R
-    #R CMD INSTALL R/cellhub
+    R CMD INSTALL R/cellhub
 
 %environment
     export LC_ALL=C
