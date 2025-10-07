@@ -120,7 +120,7 @@ From: ubuntu:22.04
 
     Rscript -e "install.packages('Cairo', repos='https://cloud.r-project.org', dependencies=TRUE)"
 
-    Rscript ./install.packages.R
+    Rscript R/install.packages.R
     #R CMD INSTALL R/cellhub
 
 %environment
