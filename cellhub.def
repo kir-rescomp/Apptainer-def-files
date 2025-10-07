@@ -1,0 +1,144 @@
+Bootstrap: docker
+From: ubuntu:22.04
+
+%labels
+    Author your.email@example.com
+    Version 1.0
+    Description Container with Python 3.11, R 4.5.1, and cellhub
+
+%post
+    # Set non-interactive mode for apt
+    export DEBIAN_FRONTEND=noninteractive
+    export TZ=Etc/UTC
+    
+    # Update and install basic dependencies
+%post
+    export DEBIAN_FRONTEND=noninteractive
+    export TZ=Etc/UTC
+
+    apt-get update && apt-get install -y \
+        wget \
+        curl \
+        git \
+        build-essential \
+        gfortran \
+        gcc \
+        g++ \
+        tzdata \
+        ca-certificates \
+        libssl-dev \
+        libcurl4-openssl-dev \
+        libxml2-dev \
+        libfontconfig1-dev \
+        libharfbuzz-dev \
+        libfribidi-dev \
+        libfreetype6-dev \
+        libpng-dev \
+        libtiff5-dev \
+        libjpeg-dev \
+        zlib1g-dev \
+        libbz2-dev \
+        liblzma-dev \
+        libreadline-dev \
+        libsqlite3-dev \
+        libffi-dev \
+        libpcre2-dev \
+        libblas-dev \
+        liblapack-dev \
+        libicu-dev \
+        libx11-dev \
+        libxt-dev \
+        libcairo2-dev \
+        libpango1.0-dev \
+        x11-common \
+        xvfb \
+        pkg-config \
+        libsystemd-dev \
+        pandoc \
+        pandoc-citeproc \
+        imagemagick \
+        libmagickwand-dev \
+        libgdk-pixbuf2.0-dev \
+        libv8-dev \
+        libwebp-dev \
+        && rm -rf /var/lib/apt/lists/*
+
+
+    # Install Python 3.11
+    cd /tmp
+    wget https://www.python.org/ftp/python/3.11.9/Python-3.11.9.tgz
+    tar xzf Python-3.11.9.tgz
+    cd Python-3.11.9
+    ./configure --enable-optimizations --with-ensurepip=install
+    make -j$(nproc)
+    make altinstall
+    ln -sf /usr/local/bin/python3.11 /usr/local/bin/python
+    ln -sf /usr/local/bin/python3.11 /usr/local/bin/python3
+    ln -sf /usr/local/bin/pip3.11 /usr/local/bin/pip
+    cd /
+    rm -rf /tmp/Python-3.11.9*
+
+    # Install R 4.5.1
+    cd /tmp
+    wget https://cran.r-project.org/src/base/R-4/R-4.5.1.tar.gz
+    tar xzf R-4.5.1.tar.gz
+    cd R-4.5.1
+    ./configure --enable-R-shlib --with-blas --with-lapack
+    make -j$(nproc)
+    make install
+    cd /
+    rm -rf /tmp/R-4.5.1*
+
+    # Upgrade pip
+    pip install --upgrade pip setuptools wheel
+
+    # Install cgatcore
+    pip install cgatcore
+
+    # Clone and install cellhub
+    cd /opt
+    git clone https://github.com/sansomlab/cellhub.git
+    cd cellhub
+    python setup.py develop
+    pip install -r ./python/requirements.txt
+    
+    # set CRAN mirror and disable interactive prompts
+    Rscript -e "options(repos = c(CRAN='https://cloud.r-project.org'));"
+
+    # install BiocManager first (you already do this; keep it)
+    Rscript -e "install.packages('BiocManager', repos='https://cloud.r-project.org')"
+
+    # install small bootstrap packages first
+    Rscript -e "install.packages(c('remotes','pkgbuild','rprojroot','rmarkdown'), repos='https://cloud.r-project.org', dependencies=TRUE)"
+
+    # install ragg and pkgdown explicitly (so you see more-targeted errors if they fail)
+    Rscript -e "install.packages('ragg', repos='https://cloud.r-project.org', dependencies=TRUE)"
+    #Rscript -e "install.packages('pkgdown', repos='https://cloud.r-project.org', dependencies=TRUE)"
+
+    # finally install devtools (ask for dependencies to be installed)
+    Rscript -e "install.packages('devtools', repos='https://cloud.r-project.org', dependencies=TRUE)"
+
+    Rscript -e "install.packages('Cairo', repos='https://cloud.r-project.org', dependencies=TRUE)"
+
+    Rscript ./install.packages.R
+    #R CMD INSTALL R/cellhub
+
+%environment
+    export LC_ALL=C
+    export PATH=/usr/local/bin:$PATH
+    export TZ=Etc/UTC
+
+%runscript
+    echo "Container with Python 3.11, R 4.5.1, and cellhub"
+    exec "$@"
+
+%help
+    This container includes:
+    - Python 3.11
+    - R 4.5.1
+    - cgatcore
+    - cellhub and all dependencies
+    
+    To use:
+        apptainer exec container.sif python your_script.py
+        apptainer exec container.sif Rscript your_script.R
