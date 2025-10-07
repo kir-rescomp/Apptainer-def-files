@@ -2,7 +2,7 @@ Bootstrap: docker
 From: ubuntu:22.04
 
 %labels
-    Author your.email@example.com
+    Author Dinindu Senanayake
     Version 1.0
     Description Container with Python 3.11, R 4.5.1, and cellhub
 
