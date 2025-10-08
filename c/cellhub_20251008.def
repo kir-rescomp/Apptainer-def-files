@@ -106,7 +106,9 @@ From: ubuntu:22.04
 
     python setup.py develop
     pip install -r ./python/requirements.txt
-    
+    pip install scvi-tools
+    pip install jax
+
     # set CRAN mirror and disable interactive prompts
     Rscript -e "options(repos = c(CRAN='https://cloud.r-project.org'));"
 
