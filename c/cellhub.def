@@ -124,6 +124,12 @@ From: ubuntu:22.04
 
     Rscript -e "install.packages('Cairo', repos='https://cloud.r-project.org', dependencies=TRUE)"
 
+    # Set CRAN mirror for install.packages.R
+    export R_REPOS="https://cloud.r-project.org"
+
+    # Patch install.packages.R to include repos
+    sed -i 's/install.packages(pkg, dep=TRUE)/install.packages(pkg, dep=TRUE, repos="https:\/\/cloud.r-project.org")/' ./R/install.packages.R
+
     Rscript R/install.packages.R
     R CMD INSTALL R/cellhub
 
