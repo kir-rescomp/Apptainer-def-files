@@ -101,7 +101,7 @@ From: ubuntu:22.04
     cd cellhub
 
     # Remove Cairo from install.packages.R before running it
-    sed -i '/^[[:space:]]*"Cairo",/d' ./R/install.packages.R
+    sed -i 's/cran_packages <- c("Cairo",/cran_packages <- c(/' ./R/install.packages.R
 
     python setup.py develop
     pip install -r ./python/requirements.txt
