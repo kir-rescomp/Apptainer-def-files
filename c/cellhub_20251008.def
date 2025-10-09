@@ -4,7 +4,7 @@ From: ubuntu:22.04
 %labels
     Author Dinindu Senanayake
     Version 1.0
-    Description Container with Python 3.11, R 4.5.1, and cellhub
+    Description Container with Python 3.11, R 4.5.1, cellhub and CellRanger 9.0.1
 
 %post
     # Set non-interactive mode for apt
@@ -62,6 +62,7 @@ From: ubuntu:22.04
         libv8-dev \
         libwebp-dev \
         libhdf5-dev \
+        time \
         && rm -rf /var/lib/apt/lists/*
 
 
@@ -136,9 +137,21 @@ From: ubuntu:22.04
     Rscript R/install.packages.R
     R CMD INSTALL R/cellhub
 
+
+    # Install CellRanger 9.0.1
+
+    cd /opt
+    curl -o cellranger-9.0.1.tar.xz "https://cf.10xgenomics.com/releases/cell-exp/cellranger-9.0.1.tar.xz?Expires=1760040204&Key-Pair-Id=APKAI7S6A5RYOXBWRPDA&Signature=b4YPi0LpNux0MV18~8AwHg9YFmkp5hYt2MGpAJZFXztgUtwejoXiIHq1xNusoiGspaTP2Q~1vcoQ3ZfL89nWPQVNlLlvvGuqASR4cB3emjM7MGfHm2Km9im8jmDHSgly6HngDZcH1AiOQLx9szsLKwH9Tp6PIP65R3BuP19T21vy-her5UpaCWYDwuPEtpz8TYfV4NgDT4npqc6yGReppnEy09ooVPVY2p0TvsOSLImDavighifARj0YaYjsd1kVxkWbQcPnf1AS-fWrxGApTJmj0BXHtcbRkrucFhHhiNZ5DM41lMZpPpRyGRLUZh6rVZzDLP5nuQJ5WRoCyegh6g__"
+    tar -xf cellranger-9.0.1.tar.xz
+    rm cellranger-9.0.1.tar.xz
+    # Create symbolic link so cellranger is in PATH
+    ln -sf /opt/cellranger-9.0.1/bin/cellranger /usr/local/bin/cellranger
+
+
+
 %environment
     export LC_ALL=C
-    export PATH=/usr/local/bin:$PATH
+    export PATH=/opt/cellranger-9.0.1/bin:/usr/local/bin:$PATH
     export TZ=Etc/UTC
 
 %runscript
