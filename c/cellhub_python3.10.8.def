@@ -1,0 +1,170 @@
+Bootstrap: docker
+From: ubuntu:22.04
+
+%labels
+    Author Dinindu Senanayake
+    Version 1.0
+    Description Container with Python 3.10.8, R 4.5.1, cellhub and CellRanger 9.0.1
+
+%post
+    # Set non-interactive mode for apt
+    export DEBIAN_FRONTEND=noninteractive
+    export TZ=Etc/UTC
+    
+    # Update and install basic dependencies
+%post
+    export DEBIAN_FRONTEND=noninteractive
+    export TZ=Etc/UTC
+
+    apt-get update && apt-get install -y \
+        wget \
+        curl \
+        git \
+        build-essential \
+        gfortran \
+        gcc \
+        g++ \
+        tzdata \
+        ca-certificates \
+        libssl-dev \
+        libcurl4-openssl-dev \
+        libxml2-dev \
+        libfontconfig1-dev \
+        libharfbuzz-dev \
+        libfribidi-dev \
+        libfreetype6-dev \
+        libpng-dev \
+        libtiff5-dev \
+        libjpeg-dev \
+        zlib1g-dev \
+        libbz2-dev \
+        liblzma-dev \
+        libreadline-dev \
+        libsqlite3-dev \
+        libffi-dev \
+        libpcre2-dev \
+        libblas-dev \
+        liblapack-dev \
+        libicu-dev \
+        libx11-dev \
+        libxt-dev \
+        libcairo2-dev \
+        libpango1.0-dev \
+        x11-common \
+        xvfb \
+        pkg-config \
+        libsystemd-dev \
+        pandoc \
+        pandoc-citeproc \
+        imagemagick \
+        libmagickwand-dev \
+        libgdk-pixbuf2.0-dev \
+        libv8-dev \
+        libwebp-dev \
+        libhdf5-dev \
+        time \
+        && rm -rf /var/lib/apt/lists/*
+
+
+    # Install Python 3.10.8
+    cd /tmp
+    wget https://www.python.org/ftp/python/3.10.8/Python-3.10.8.tgz
+    tar xzf Python-3.10.8.tgz
+    cd Python-3.10.8
+    ./configure --enable-optimizations --with-ensurepip=install
+    make -j$(nproc)
+    make altinstall
+    ln -sf /usr/local/bin/python3.10 /usr/local/bin/python
+    ln -sf /usr/local/bin/python3.10 /usr/local/bin/python3
+    ln -sf /usr/local/bin/pip3.10 /usr/local/bin/pip
+    cd /
+    rm -rf /tmp/Python-3.10.8*
+
+    # Install R 4.5.1
+    cd /tmp
+    wget https://cran.r-project.org/src/base/R-4/R-4.5.1.tar.gz
+    tar xzf R-4.5.1.tar.gz
+    cd R-4.5.1
+    ./configure --enable-R-shlib --with-blas --with-lapack
+    make -j$(nproc)
+    make install
+    cd /
+    rm -rf /tmp/R-4.5.1*
+
+    # Upgrade pip
+    pip install --upgrade pip setuptools wheel
+
+    # Install cgatcore
+    pip install cgatcore
+
+    # Clone and install cellhub
+    cd /opt
+    git clone https://github.com/sansomlab/cellhub.git
+    cd cellhub
+
+    # Remove Cairo from install.packages.R before running it
+    sed -i 's/cran_packages <- c("Cairo",/cran_packages <- c(/' ./R/install.packages.R
+
+    python setup.py develop
+    pip install -r ./python/requirements.txt
+    pip install scvi-tools
+    pip install jax
+
+    # set CRAN mirror and disable interactive prompts
+    Rscript -e "options(repos = c(CRAN='https://cloud.r-project.org'));"
+
+    # install BiocManager first (you already do this; keep it)
+    Rscript -e "install.packages('BiocManager', repos='https://cloud.r-project.org')"
+
+    # install small bootstrap packages first
+    Rscript -e "install.packages(c('remotes','pkgbuild','rprojroot','rmarkdown'), repos='https://cloud.r-project.org', dependencies=TRUE)"
+
+    # install ragg and pkgdown explicitly (so you see more-targeted errors if they fail)
+    Rscript -e "install.packages('ragg', repos='https://cloud.r-project.org', dependencies=TRUE)"
+    #Rscript -e "install.packages('pkgdown', repos='https://cloud.r-project.org', dependencies=TRUE)"
+
+    # finally install devtools (ask for dependencies to be installed)
+    Rscript -e "install.packages('devtools', repos='https://cloud.r-project.org', dependencies=TRUE)"
+
+    Rscript -e "install.packages('Cairo', repos='https://cloud.r-project.org', dependencies=TRUE)"
+
+    # Set CRAN mirror for install.packages.R
+    export R_REPOS="https://cloud.r-project.org"
+
+    # Patch install.packages.R to include repos
+    sed -i 's/install.packages(pkg, dep=TRUE)/install.packages(pkg, dep=TRUE, repos="https:\/\/cloud.r-project.org")/' ./R/install.packages.R
+
+    Rscript R/install.packages.R
+    R CMD INSTALL R/cellhub
+
+
+    # Install CellRanger 9.0.1
+
+    cd /opt
+    curl -o cellranger-9.0.1.tar.xz "https://cf.10xgenomics.com/releases/cell-exp/cellranger-9.0.1.tar.xz?Expires=1760040204&Key-Pair-Id=APKAI7S6A5RYOXBWRPDA&Signature=b4YPi0LpNux0MV18~8AwHg9YFmkp5hYt2MGpAJZFXztgUtwejoXiIHq1xNusoiGspaTP2Q~1vcoQ3ZfL89nWPQVNlLlvvGuqASR4cB3emjM7MGfHm2Km9im8jmDHSgly6HngDZcH1AiOQLx9szsLKwH9Tp6PIP65R3BuP19T21vy-her5UpaCWYDwuPEtpz8TYfV4NgDT4npqc6yGReppnEy09ooVPVY2p0TvsOSLImDavighifARj0YaYjsd1kVxkWbQcPnf1AS-fWrxGApTJmj0BXHtcbRkrucFhHhiNZ5DM41lMZpPpRyGRLUZh6rVZzDLP5nuQJ5WRoCyegh6g__"
+    tar -xf cellranger-9.0.1.tar.xz
+    rm cellranger-9.0.1.tar.xz
+    # Create symbolic link so cellranger is in PATH
+    ln -sf /opt/cellranger-9.0.1/bin/cellranger /usr/local/bin/cellranger
+
+
+
+%environment
+    export LC_ALL=C
+    export PATH=/opt/cellranger-9.0.1/bin:/usr/local/bin:$PATH
+    export TZ=Etc/UTC
+
+%runscript
+    echo "Container with Python 3.10.8, R 4.5.1, and cellhub"
+    exec "$@"
+
+%help
+    This container includes:
+    - Python 3.10.8
+    - R 4.5.1
+    - cgatcore
+    - cellhub and all dependencies
+    
+    To use:
+        apptainer exec container.sif python your_script.py
+        apptainer exec container.sif Rscript your_script.R
