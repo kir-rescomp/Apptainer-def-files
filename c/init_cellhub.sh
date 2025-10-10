@@ -5,11 +5,13 @@
 export CELLHUB_CONTAINER="/gpfs3/well/sansom/projects/cellhub.aif"
 
 # Set bind paths
-export APPTAINER_BIND="/gpfs3/well,/gpfs3/users"
+export APPTAINER_BIND="/gpfs3/well,/gpfs3/users,/gpfs3/well/kir,/well/kir"
 
 # Create a function instead of a script
 cellhub() {
-    apptainer exec --pwd "$PWD" "$CELLHUB_CONTAINER" cellhub "$@"
+    #resolve symlinks to get real path
+    local REAL_PWD=$(readlink -f "$PWD")
+    apptainer exec --no-home --pwd "$REAL_PWD" "$CELLHUB_CONTAINER" cellhub "$@"
 }
 
 # Export the function so it's available in the shell
