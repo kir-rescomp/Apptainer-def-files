@@ -2,7 +2,8 @@ Bootstrap: docker
 From: ubuntu:22.04
 
 %labels
-    Author Dinindu Senanayake
+    Author BMRC
+    Version 1.0
     Description ABodyBuilder3 - Antibody structure prediction
 
 %arguments
@@ -10,11 +11,14 @@ From: ubuntu:22.04
 
 %environment
     export PATH="/opt/miniforge3/bin:$PATH"
-    export CONDA_DEFAULT_ENV="ABodyBuilder3"
     export PATH="/opt/miniforge3/envs/ABodyBuilder3/bin:$PATH"
+    export PATH="/opt/abodybuilder3/bin:$PATH"
+    export CONDA_DEFAULT_ENV="ABodyBuilder3"
     export LD_LIBRARY_PATH="/opt/miniforge3/envs/ABodyBuilder3/lib:$LD_LIBRARY_PATH"
     export MPLCONFIGDIR="/tmp/matplotlib"
     export HF_HOME="/opt/abodybuilder3/hf_cache"
+    # Makes the editable src/ install unambiguous at runtime
+    export PYTHONPATH="/opt/abodybuilder3/src:$PYTHONPATH"
 
 %post
     # ── System dependencies ──────────────────────────────────────────────────
@@ -42,8 +46,7 @@ From: ubuntu:22.04
     conda update -n base -c conda-forge conda -y
     conda clean --all -y
 
-    # ── Clone ABodyBuilder3 ──────────────────────────────────────────────────
-    mkdir -p /opt/abodybuilder3
+    # ── Clone ABodyBuilder3 (full repo, src/ included) ───────────────────────
     git clone https://github.com/Exscientia/abodybuilder3.git /opt/abodybuilder3
     cd /opt/abodybuilder3
 
@@ -51,11 +54,9 @@ From: ubuntu:22.04
     bash download.sh
 
     # ── Patch the environment YAML ───────────────────────────────────────────
-    # Choose gpu or cpu variant via the VARIANT build arg (default: gpu)
     VARIANT="{{ VARIANT }}"
     ENV_FILE="environment_${VARIANT}.yml"
 
-    # Inject the conda env name if not already present
     if ! grep -q "^name:" "${ENV_FILE}"; then
         sed -i "1s/^/name: ABodyBuilder3\n/" "${ENV_FILE}"
     else
@@ -71,7 +72,7 @@ From: ubuntu:22.04
     /opt/miniforge3/envs/ABodyBuilder3/bin/pip cache remove lxml
     conda run -n ABodyBuilder3 conda install --yes -c conda-forge "lxml=4.9.4"
 
-    # ── Install ABodyBuilder3 ────────────────────────────────────────────────
+    # ── Install ABodyBuilder3 (editable, pointing at src/) ───────────────────
     cd /opt/abodybuilder3
     /opt/miniforge3/envs/ABodyBuilder3/bin/pip install -e ".[dev]" \
         --constraint pinned-versions.txt
@@ -79,6 +80,23 @@ From: ubuntu:22.04
     # ── Pin huggingface_hub ──────────────────────────────────────────────────
     /opt/miniforge3/envs/ABodyBuilder3/bin/pip install --upgrade \
         "huggingface_hub==0.23.0"
+
+    # ── Collect scripts into /opt/abodybuilder3/bin and add to PATH ──────────
+    mkdir -p /opt/abodybuilder3/bin
+
+    # download.sh — useful to re-fetch weights if bind-mounting a weights dir
+    cp /opt/abodybuilder3/download.sh \
+       /opt/abodybuilder3/bin/abb3-download
+
+    # experiment_scripts/
+    cp /opt/abodybuilder3/experiment_scripts/submit_base.sh \
+       /opt/abodybuilder3/bin/abb3-submit-base
+    cp /opt/abodybuilder3/experiment_scripts/submit_language.sh \
+       /opt/abodybuilder3/bin/abb3-submit-language
+    cp /opt/abodybuilder3/experiment_scripts/submit_plddt.sh \
+       /opt/abodybuilder3/bin/abb3-submit-plddt
+
+    chmod +x /opt/abodybuilder3/bin/*
 
     # ── Permissions & cleanup ────────────────────────────────────────────────
     chmod -R 755 /opt/miniforge3
@@ -96,6 +114,11 @@ From: ubuntu:22.04
     echo "=== Testing ABodyBuilder3 installation ==="
     /opt/miniforge3/envs/ABodyBuilder3/bin/python -c "
 import abodybuilder3
-print(f'ABodyBuilder3 imported successfully')
+print('ABodyBuilder3 imported successfully')
+print('src location:', abodybuilder3.__file__)
 "
+    echo "=== Checking scripts on PATH ==="
+    for script in abb3-download abb3-submit-base abb3-submit-language abb3-submit-plddt; do
+        which \$script && echo "\$script found on PATH" || echo "WARNING: \$script not found"
+    done
     echo "=== Test passed ==="
