@@ -1,0 +1,101 @@
+Bootstrap: docker
+From: ubuntu:22.04
+
+%labels
+    Author Dinindu Senanayake
+    Description ABodyBuilder3 - Antibody structure prediction
+
+%arguments
+    VARIANT=gpu
+
+%environment
+    export PATH="/opt/miniforge3/bin:$PATH"
+    export CONDA_DEFAULT_ENV="ABodyBuilder3"
+    export PATH="/opt/miniforge3/envs/ABodyBuilder3/bin:$PATH"
+    export LD_LIBRARY_PATH="/opt/miniforge3/envs/ABodyBuilder3/lib:$LD_LIBRARY_PATH"
+    export MPLCONFIGDIR="/tmp/matplotlib"
+    export HF_HOME="/opt/abodybuilder3/hf_cache"
+
+%post
+    # ── System dependencies ──────────────────────────────────────────────────
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -y && apt-get install -y \
+        wget \
+        git \
+        curl \
+        bzip2 \
+        ca-certificates \
+        libglib2.0-0 \
+        libxext6 \
+        libsm6 \
+        libxrender1 \
+        && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+    # ── Install Miniforge3 ───────────────────────────────────────────────────
+    wget -q https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh \
+        -O /tmp/miniforge.sh
+    bash /tmp/miniforge.sh -b -p /opt/miniforge3
+    rm /tmp/miniforge.sh
+
+    export PATH="/opt/miniforge3/bin:$PATH"
+
+    conda update -n base -c conda-forge conda -y
+    conda clean --all -y
+
+    # ── Clone ABodyBuilder3 ──────────────────────────────────────────────────
+    mkdir -p /opt/abodybuilder3
+    git clone https://github.com/Exscientia/abodybuilder3.git /opt/abodybuilder3
+    cd /opt/abodybuilder3
+
+    # ── Download model weights ───────────────────────────────────────────────
+    bash download.sh
+
+    # ── Patch the environment YAML ───────────────────────────────────────────
+    # Choose gpu or cpu variant via the VARIANT build arg (default: gpu)
+    VARIANT="{{ VARIANT }}"
+    ENV_FILE="environment_${VARIANT}.yml"
+
+    # Inject the conda env name if not already present
+    if ! grep -q "^name:" "${ENV_FILE}"; then
+        sed -i "1s/^/name: ABodyBuilder3\n/" "${ENV_FILE}"
+    else
+        sed -i "s/^name:.*/name: ABodyBuilder3/" "${ENV_FILE}"
+    fi
+
+    # ── Create conda environment ─────────────────────────────────────────────
+    conda env create -f "${ENV_FILE}"
+    conda clean --all -y
+
+    # ── Fix lxml version ─────────────────────────────────────────────────────
+    /opt/miniforge3/envs/ABodyBuilder3/bin/pip uninstall --yes lxml
+    /opt/miniforge3/envs/ABodyBuilder3/bin/pip cache remove lxml
+    conda run -n ABodyBuilder3 conda install --yes -c conda-forge "lxml=4.9.4"
+
+    # ── Install ABodyBuilder3 ────────────────────────────────────────────────
+    cd /opt/abodybuilder3
+    /opt/miniforge3/envs/ABodyBuilder3/bin/pip install -e ".[dev]" \
+        --constraint pinned-versions.txt
+
+    # ── Pin huggingface_hub ──────────────────────────────────────────────────
+    /opt/miniforge3/envs/ABodyBuilder3/bin/pip install --upgrade \
+        "huggingface_hub==0.23.0"
+
+    # ── Permissions & cleanup ────────────────────────────────────────────────
+    chmod -R 755 /opt/miniforge3
+    chmod -R 755 /opt/abodybuilder3
+    mkdir -p /opt/abodybuilder3/hf_cache
+    chmod -R 777 /opt/abodybuilder3/hf_cache
+
+    conda clean --all -f -y
+    /opt/miniforge3/envs/ABodyBuilder3/bin/pip cache purge
+
+%runscript
+    exec /opt/miniforge3/envs/ABodyBuilder3/bin/python "$@"
+
+%test
+    echo "=== Testing ABodyBuilder3 installation ==="
+    /opt/miniforge3/envs/ABodyBuilder3/bin/python -c "
+import abodybuilder3
+print(f'ABodyBuilder3 imported successfully')
+"
+    echo "=== Test passed ==="
