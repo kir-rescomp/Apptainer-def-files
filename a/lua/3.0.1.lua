@@ -3,43 +3,35 @@ help([==[
 
 Description
 ===========
-AlphaFold can predict protein structures with atomic accuracy even where no similar structure is known
-
+AlphaFold 3 can predict the structure of proteins, DNA, RNA, and ligands with atomic accuracy.
 
 More information
 ================
- - Homepage: https://github.com/deepmind/alphafold
+ - Homepage: https://github.com/google-deepmind/alphafold3
 ]==])
 
+whatis([==[Description: AlphaFold 3 can predict the structure of proteins, DNA, RNA, and ligands]==])
+whatis([==[Homepage: https://github.com/google-deepmind/alphafold3]==])
 
-whatis([==[Description: AlphaFold can predict protein structures with atomic accuracy even where no similar structure is known]==])
-whatis([==[Homepage: https://github.com/deepmind/alphafold]==])
-whatis([==[URL: https://github.com/deepmind/alphafold]==])
 
--- Load required dependencies
-load("Apptainer/1.2.5")
 
-local version = "3.0.0"
-local alphafold_root = "/opt/nesi/containers/AlphaFold"  -- Modify this path to where your container is stored
-
--- Define the Apptainer binary path
-local apptainer = "apptainer"
+local version = "3.0.1"
+local alphafold_root = "/gpfs3/well/kir/projects/mirror/containers/Apptainer-def-files/a/"
+local container = pathJoin(alphafold_root, "alphafold3-" .. version .. ".sif")
 
 -- Set environment variables
 setenv("ALPHAFOLD_ROOT", alphafold_root)
-setenv("ALPHAFOLD_CONTAINER", pathJoin(alphafold_root, "alphafold3-3.0.1.aimg"))
+setenv("ALPHAFOLD_CONTAINER", container)
 
--- Create a shell function for run_alphafold.py that automatically uses apptainer exec
-set_shell_function("run_alphafold.py", 
-     string.format('%s exec --nv %s/alphafold3-3.0.1.aimg run_alphafold.py "$@"', 
-             apptainer, 
-             alphafold_root
-     ))
+-- run_alphafold.py is invoked via the container's runscript
+-- Use 'apptainer run' so the %runscript entry point is used
+set_shell_function("run_alphafold.py",
+    string.format('apptainer run --nv %s python3 /app/alphafold/run_alphafold.py "$@"', container)
+)
 
--- Set GPU related variables (assuming you're using CUDA)
+-- GPU / XLA settings
 pushenv("XLA_FLAGS", "--xla_gpu_enable_triton_gemm=false")
 pushenv("XLA_PYTHON_CLIENT_PREALLOCATE", "true")
 pushenv("XLA_CLIENT_MEM_FRACTION", "0.95")
 
--- Conflict with other versions of AlphaFold if they exist
 conflict("AlphaFold")
