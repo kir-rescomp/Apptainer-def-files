@@ -1,7 +1,7 @@
 # Apptainer-def-files
 
 <p align="center">
-<img src="./images/apptainer_def_files_logo.png"/>
+<img src="./images/apptainer_def_files_logo.png" width="300"/>
 </p>
 
 Collection of Apptainer definition files for KIR 
