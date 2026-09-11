@@ -2,7 +2,7 @@ Bootstrap: docker
 From: ubuntu:22.04
 
 %labels
-    Author BMRC
+    Author Dinindu Senanayake
     Version 1.0
     Description ABodyBuilder3 - Antibody structure prediction
 
