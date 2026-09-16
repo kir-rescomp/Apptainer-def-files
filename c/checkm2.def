@@ -1,0 +1,60 @@
+Bootstrap: docker
+From: condaforge/miniforge3:26.7.2-0
+
+%files
+    checkm2.yml /opt/checkm2.yml
+
+%post
+    export DEBIAN_FRONTEND=noninteractive
+
+    apt-get update && \
+        apt-get install -y --no-install-recommends git ca-certificates && \
+        apt-get clean && \
+        rm -rf /var/lib/apt/lists/*
+
+    # Build the checkm2 environment from the supplied conda yml
+    mamba env create -n checkm2 -f /opt/checkm2.yml
+    mamba clean --all --yes
+
+    # Activate the environment for the rest of the build
+    # (use POSIX '.' rather than 'source' - /bin/sh here is dash, which
+    # has no 'source' builtin)
+    . /opt/conda/etc/profile.d/conda.sh
+    conda activate checkm2
+
+    cd /opt
+    git clone --recursive https://github.com/chklovski/checkm2.git
+    cd checkm2
+    python setup.py install
+    # setup.py install is deprecated upstream; if you hit issues, use instead:
+    #   pip install --no-deps .
+
+%environment
+    export PATH=/opt/conda/envs/checkm2/bin:$PATH
+    export LC_ALL=C
+    export LANG=C
+
+%runscript
+    exec /opt/conda/envs/checkm2/bin/checkm2 "$@"
+
+%labels
+    Author        Dinindu Senanayake
+    Application   CheckM2
+    BaseImage     condaforge/miniforge3:26.7.2-0
+    CondaEnv      checkm2
+
+%help
+    CheckM2 container built on Miniforge (conda-forge), for the BMRC cluster.
+
+    Build:
+        apptainer build checkm2.sif checkm2.def
+
+    Run:
+        apptainer run checkm2.sif predict --threads 8 \
+            --input <fasta_dir> --output-directory <outdir>
+
+    Note: CheckM2 needs its DIAMOND reference database available at
+    runtime. Either bake it into the image under /opt/checkm2/database,
+    or bind-mount it in and set CHECKM2DB accordingly, e.g.:
+        apptainer run --bind /well/rescomp/shared/checkm2_db:/db \
+            checkm2.sif predict --database_path /db/uniref100.KO.1.dmnd ...
