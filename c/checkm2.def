@@ -17,7 +17,9 @@ From: condaforge/miniforge3:26.7.2-0
     mamba clean --all --yes
 
     # Activate the environment for the rest of the build
-    source /opt/conda/etc/profile.d/conda.sh
+    # (use POSIX '.' rather than 'source' - /bin/sh here is dash, which
+    # has no 'source' builtin)
+    . /opt/conda/etc/profile.d/conda.sh
     conda activate checkm2
 
     cd /opt
@@ -37,7 +39,6 @@ From: condaforge/miniforge3:26.7.2-0
 
 %labels
     Author        Dinindu Senanayake
-    Organisation  Kennedy Institute of Rheumatology, University of Oxford
     Application   CheckM2
     BaseImage     condaforge/miniforge3:26.7.2-0
     CondaEnv      checkm2
