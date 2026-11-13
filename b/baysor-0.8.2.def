@@ -1,0 +1,137 @@
+# Apptainer definition for Baysor 0.8.2 (C++ implementation)
+# Source: https://github.com/kharchenkolab/Baysor/archive/refs/tags/cpp-0.8.2.tar.gz
+#
+# Build:
+#   apptainer build --fakeroot baysor-0.8.2.sif baysor-0.8.2.def
+#
+# The build requires network access (apt repositories, Apache Arrow
+# repository and GitHub), so it must run on a host with outbound access.
+
+############################################################
+# Stage 1: build
+############################################################
+Bootstrap: docker
+From: ubuntu:24.04
+Stage: build
+
+%post
+    set -eu
+    export DEBIAN_FRONTEND=noninteractive
+
+    BAYSOR_VERSION=0.8.2
+    BAYSOR_TAG="cpp-${BAYSOR_VERSION}"
+    BAYSOR_URL="https://github.com/kharchenkolab/Baysor/archive/refs/tags/${BAYSOR_TAG}.tar.gz"
+
+    # Apache Arrow apt repository (provides libarrow-dev / libparquet-dev)
+    apt-get update
+    apt-get install -y --no-install-recommends ca-certificates lsb-release wget
+    DISTRO=$(lsb_release --id --short | tr 'A-Z' 'a-z')
+    CODENAME=$(lsb_release --codename --short)
+    wget -q "https://packages.apache.org/artifactory/arrow/${DISTRO}/apache-arrow-apt-source-latest-${CODENAME}.deb"
+    apt-get install -y --no-install-recommends "./apache-arrow-apt-source-latest-${CODENAME}.deb"
+    rm -f "./apache-arrow-apt-source-latest-${CODENAME}.deb"
+
+    apt-get update
+    apt-get install -y --no-install-recommends \
+        build-essential \
+        cmake \
+        ninja-build \
+        pkg-config \
+        git \
+        libeigen3-dev \
+        libomp-dev \
+        libspdlog-dev \
+        libcgal-dev \
+        libarrow-dev \
+        libparquet-dev \
+        libhdf5-dev \
+        nlohmann-json3-dev \
+        libtiff-dev
+
+    # Fetch and unpack the Baysor 0.8.2 source
+    mkdir -p /src
+    cd /src
+    wget -q -O baysor.tar.gz "${BAYSOR_URL}"
+    tar -xzf baysor.tar.gz --strip-components=1
+    rm -f baysor.tar.gz
+
+    # Configure and build (job count capped at 8 to remain reasonable on shared login nodes)
+    JOBS=$(nproc)
+    [ "${JOBS}" -gt 8 ] && JOBS=8
+    cmake -S . -B build -GNinja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBAYSOR_WITH_TESTS=OFF
+    cmake --build build --target baysor -j"${JOBS}"
+
+    test -x /src/build/baysor
+
+############################################################
+# Stage 2: runtime
+############################################################
+Bootstrap: docker
+From: ubuntu:24.04
+Stage: final
+
+%files from build
+    /src/build/baysor /usr/local/bin/baysor
+
+%post
+    set -eu
+    export DEBIAN_FRONTEND=noninteractive
+
+    apt-get update
+    apt-get install -y --no-install-recommends ca-certificates lsb-release wget
+    DISTRO=$(lsb_release --id --short | tr 'A-Z' 'a-z')
+    CODENAME=$(lsb_release --codename --short)
+    wget -q "https://packages.apache.org/artifactory/arrow/${DISTRO}/apache-arrow-apt-source-latest-${CODENAME}.deb"
+    apt-get install -y --no-install-recommends "./apache-arrow-apt-source-latest-${CODENAME}.deb"
+    rm -f "./apache-arrow-apt-source-latest-${CODENAME}.deb"
+
+    # Runtime libraries (package set as per the upstream Dockerfile; libgomp1
+    # added explicitly because the binary is built with GCC's OpenMP)
+    apt-get update
+    apt-get install -y --no-install-recommends \
+        libgomp1 \
+        libeigen3-dev \
+        libomp-dev \
+        libspdlog-dev \
+        libcgal-dev \
+        libarrow-dev \
+        libparquet-dev \
+        libhdf5-dev \
+        nlohmann-json3-dev \
+        libtiff-dev
+
+    apt-get clean
+    rm -rf /var/lib/apt/lists/*
+
+%environment
+    export LC_ALL=C.UTF-8
+    export LANG=C.UTF-8
+
+%runscript
+    exec /usr/local/bin/baysor "$@"
+
+%test
+    set -eu
+    test -x /usr/local/bin/baysor
+    if ldd /usr/local/bin/baysor | grep -q 'not found'; then
+        echo "Baysor has unresolved shared library dependencies:" >&2
+        ldd /usr/local/bin/baysor | grep 'not found' >&2
+        exit 1
+    fi
+    echo "Baysor binary present and all shared libraries resolved."
+
+%labels
+    Name Baysor
+    Version 0.8.2
+    Source https://github.com/kharchenkolab/Baysor/archive/refs/tags/cpp-0.8.2.tar.gz
+    Base ubuntu:24.04
+
+%help
+    Baysor 0.8.2 (C++ implementation): Bayesian segmentation of
+    imaging-based spatial transcriptomics data.
+
+    Usage:
+        apptainer run baysor-0.8.2.sif <subcommand> [options]
+        apptainer exec baysor-0.8.2.sif baysor <subcommand> [options]
